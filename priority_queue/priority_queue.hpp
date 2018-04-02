@@ -34,8 +34,7 @@ private:
 			if(rc) delete rc;
 		}
 
-		Node(const Node *other) {
-			val = other->val;
+		Node(const Node *other): val(other->val) {
 			lc = rc = nullptr;
 			if(other->lc) lc = new Node(other->lc);
 			if(other->rc) rc = new Node(other->rc);
@@ -89,38 +88,19 @@ public:
 	 */
 	const T & top() const {
 		if(sz == 0) {
-			throw new container_is_empty;
+			throw container_is_empty();
 		}
 		return root->val;
 	}
 	/**
-	 * TODO
 	 * push new element to the priority queue.
 	 */
-	void push(const T &e) {
-		if(sz == 0) {
-			root = new Node(e, nullptr, nullptr);
-		} else {
-			Node *t = new Node(e, nullptr, nullptr);
-			root = __merge(root, t);
-		}
-		sz++;
-	}
+	void push(const T &e);
 	/**
-	 * TODO
 	 * delete the top element.
 	 * throw container_is_empty if empty() returns true;
 	 */
-	void pop() {
-		if(sz == 0) {
-			throw new container_is_empty;
-		}
-		Node *t = root;
-		root = __merge(root->lc, root->rc);
-		t->lc = t->rc = nullptr;
-		delete t;
-		sz--;
-	}
+	void pop();
 	/**
 	 * return the number of the elements.
 	 */
@@ -141,7 +121,7 @@ public:
 		sz += other.sz;
 		root = __merge(root, other.root);
 		other.root = nullptr;
-		other.size = 0;
+		other.sz = 0;
 	}
 
 private:
@@ -166,6 +146,30 @@ private:
 		return a;
 	}
 };
+
+template<typename T, class Compare>
+void priority_queue<T, Compare>::push(const T &e)
+{
+	if(sz == 0) {
+		root = new Node(e, nullptr, nullptr);
+	} else {
+		Node *t = new Node(e, nullptr, nullptr);
+		root = __merge(root, t);
+	}
+	sz++;
+}
+
+template<typename T, class Compare>
+void priority_queue<T, Compare>::pop() {
+	if(sz == 0) {
+		throw container_is_empty();
+	}
+	Node *t = root;
+	root = __merge(root->lc, root->rc);
+	t->lc = t->rc = nullptr;
+	delete t;
+	sz--;
+}
 
 }
 
