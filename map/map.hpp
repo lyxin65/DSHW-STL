@@ -12,11 +12,70 @@
 
 namespace sjtu {
 
+inline int rnd() {
+	static unsigned seed = 6791654;
+	seed = seed * 998244353 + 21474;
+	return seed & ((1 << 31) - 1);
+}
+
 template<
 	class Key,
 	class T,
 	class Compare = std::less<Key>
 > class map {
+private:
+	struct Node {
+		int r;
+		Node *lc, *rc, *fa;
+		value_type *val;
+		Node(const value_type *&val = nullptr, const Node *&lc = nullptr, const Node *&rc = nullptr, const Node *&fa = nullptr): t(t), lc(lc), rc(rc), fa(fa) {
+			r = rnd();
+		}
+
+	} *root;
+
+	size_t sz;
+
+	Node *vir_node() {
+		Node *t = new Node();
+		return t;
+	}
+
+	Node *find_pre(Node *o) {
+		if(lc) {
+			o = o->lc;
+			while(o->rc) {
+				o = o->rc;
+			}
+			return o;
+		} else {
+			while(o->fa && o->fa->rc != o) {
+				o = o->fa;
+			}
+			if(o->fa == nullptr)
+				throw invalid_iterator();
+			return o->fa;
+		}
+	}
+
+	Node *find_nxt(Node *o)
+	{
+		if(rc) {
+			o = o->rc;
+			while(o->lc) {
+				o = o->lc;
+			}
+			return o;
+		} else {
+			while(o->fa && o->fa->lc != o) {
+				o = o->fa;
+			}
+			if(o->fa == nullptr)
+				throw invalid_iterator();
+			return o->fa;
+		}
+	}
+
 public:
 	/**
 	 * the internal type of data.
@@ -33,97 +92,208 @@ public:
 	 */
 	class const_iterator;
 	class iterator {
+		friend class const_iterator;
 	private:
-		/**
-		 * TODO add data members
-		 *   just add whatever you want.
-		 */
+		Node *o;
+
 	public:
-		iterator() {
-			// TODO
-		}
-		iterator(const iterator &other) {
-			// TODO
-		}
+		iterator(const Node *&o): o(o) {}
+		iterator(const iterator &other): o(other.o) {}
 		/**
 		 * return a new iterator which pointer n-next elements
 		 *   even if there are not enough elements, just return the answer.
 		 * as well as operator-
 		 */
 		/**
-		 * TODO iter++
+		 * iter++
 		 */
-		iterator operator++(int) {}
+		iterator operator++(int) {
+			iterator tmp = *this;
+			++(*this);
+			return tmp;
+		}
 		/**
-		 * TODO ++iter
+		 * ++iter
 		 */
-		iterator & operator++() {}
+		iterator & operator++() {
+			o = find_nxt(o);
+			return *this;
+		}
 		/**
-		 * TODO iter--
+		 * iter--
 		 */
-		iterator operator--(int) {}
+		iterator operator--(int) {
+			iterator tmp = *this;
+			--(*this);
+			return tmp;
+		}
 		/**
-		 * TODO --iter
+		 * --iter
 		 */
-		iterator & operator--() {}
+		iterator & operator--() {
+			 o = find_nxt(o);
+			 return *this;
+		}
 		/**
 		 * a operator to check whether two iterators are same (pointing to the same memory).
 		 */
-		value_type & operator*() const {}
-		bool operator==(const iterator &rhs) const {}
-		bool operator==(const const_iterator &rhs) const {}
+		value_type & operator*() const {
+			return *o->val;
+		}
+		bool operator==(const iterator &rhs) const {
+			return o == rhs.o;
+		}
+		bool operator==(const const_iterator &rhs) const {
+			return o == rhs.o;
+		}
 		/**
 		 * some other operator for iterator.
 		 */
-		bool operator!=(const iterator &rhs) const {}
-		bool operator!=(const const_iterator &rhs) const {}
+		bool operator!=(const iterator &rhs) const {
+			return !(*this == rhs);
+		}
+		bool operator!=(const const_iterator &rhs) const {
+			return !(*this == rhs);
+		}
 
 		/**
 		 * for the support of it->first. 
 		 * See <http://kelvinh.github.io/blog/2013/11/20/overloading-of-member-access-operator-dash-greater-than-symbol-in-cpp/> for help.
 		 */
-		value_type* operator->() const noexcept {}
+		value_type* operator->() const noexcept {
+			return o->val;
+		}
 	};
 	class const_iterator {
+		friend class iterator;
 		// it should has similar member method as iterator.
 		//  and it should be able to construct from an iterator.
-		private:
-			// data members.
-		public:
-			const_iterator() {
-				// TODO
-			}
-			const_iterator(const const_iterator &other) {
-				// TODO
-			}
-			const_iterator(const iterator &other) {
-				// TODO
-			}
-			// And other methods in iterator.
-			// And other methods in iterator.
-			// And other methods in iterator.
+	private:
+		Node *o;
+	public:
+		const_iterator(const Node *&o): o(o) {}
+		const_iterator(const const_iterator &other): o(other.o) {}
+		const_iterator(const iterator &other): o(other.o) {}
+		/**
+		 * return a new iterator which pointer n-next elements
+		 *   even if there are not enough elements, just return the answer.
+		 * as well as operator-
+		 */
+		/**
+		 * iter++
+		 */
+		const_iterator operator++(int) {
+			const_iterator tmp = *this;
+			++(*this);
+			return tmp;
+		}
+		/**
+		 * ++iter
+		 */
+		const_iterator & operator++() {
+			o = find_nxt(o);
+			return *this;
+		}
+		/**
+		 * iter--
+		 */
+		const_iterator operator--(int) {
+			const_iterator tmp = *this;
+			--(*this);
+			return tmp;
+		}
+		/**
+		 * --iter
+		 */
+		const_iterator & operator--() {
+			 o = find_nxt(o);
+			 return *this;
+		}
+		/**
+		 * a operator to check whether two iterators are same (pointing to the same memory).
+		 */
+		const value_type & operator*() const {
+			return *o->val;
+		}
+		bool operator==(const iterator &rhs) const {
+			return o == rhs.o;
+		}
+		bool operator==(const const_iterator &rhs) const {
+			return o == rhs.o;
+		}
+		/**
+		 * some other operator for iterator.
+		 */
+		bool operator!=(const iterator &rhs) const {
+			return !(*this == rhs);
+		}
+		bool operator!=(const const_iterator &rhs) const {
+			return !(*this == rhs);
+		}
+
+		/**
+		 * for the support of it->first. 
+		 * See <http://kelvinh.github.io/blog/2013/11/20/overloading-of-member-access-operator-dash-greater-than-symbol-in-cpp/> for help.
+		 */
+		const value_type* operator->() const noexcept {
+			return o->val;
+		}
 	};
 	/**
 	 * TODO two constructors
 	 */
-	map() {}
-	map(const map &other) {}
+	map(): root(vir_node()), sz(0) {}
+	map(const map &other) {
+		sz = other.sz;
+		if(other.root) {
+			root = new Node(other.root);
+		} else {
+			throw WTF();
+		}
+	}
 	/**
 	 * TODO assignment operator
 	 */
-	map & operator=(const map &other) {}
+	map & operator=(const map &other) {
+		if(root == other.root) {
+			return;
+		}
+		if(root) {
+			delete root;
+		}
+		sz = other.sz;
+		if(other.root) {
+			root = new Node(other.root);
+		} else {
+			throw WTF();
+		}
+	}
 	/**
 	 * TODO Destructors
 	 */
-	~map() {}
+	~map() {
+		if(root) {
+			delete root;
+		}
+	}
 	/**
 	 * TODO
 	 * access specified element with bounds checking
 	 * Returns a reference to the mapped value of the element with key equivalent to key.
 	 * If no such element exists, an exception of type `index_out_of_bound'
 	 */
-	T & at(const Key &key) {}
-	const T & at(const Key &key) const {}
+	T & at(const Key &key) {
+		Node *o = find(key);
+		if(o == nullptr)
+			throw index_out_of_bound();
+		return o->val->second;
+	}
+	const T & at(const Key &key) const {
+		Node *o = find(key);
+		if(o == nullptr)
+			throw index_out_of_bound();
+		return o->val->second;
+	}
 	/**
 	 * TODO
 	 * access specified element 

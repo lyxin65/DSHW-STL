@@ -6,7 +6,7 @@
 #include "exceptions.hpp"
 
 template<typename T>
-void swap(T &x, T &y) {
+inline void swap(T &x, T &y) {
 	T z = x;
 	x = y;
 	y = z;
@@ -124,19 +124,18 @@ public:
 		other.sz = 0;
 	}
 
+	void merge(priority_queue &&other) {
+		merge(other);
+	}
+
 private:
 	Node *__merge(Node *a, Node *b) {
 		if(!a) return b;
 		if(!b) return a;
 		static Compare c;
-		if(!c(a->val, b->val)) {
-			return solve(a, b);
-		} else {
-			return solve(b, a);
+		if(c(a->val, b->val)) {
+			swap(a, b);
 		}
-	}
-	Node *solve(Node *a, Node *b)
-	{
 		if(!a->lc) {
 			a->lc = b;
 		} else {

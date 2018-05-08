@@ -1,0 +1,286 @@
+#ifndef SJTU_DEQUE_HPP
+#define SJTU_DEQUE_HPP
+
+#include "exceptions.hpp"
+
+#include <cstddef>
+
+namespace sjtu { 
+
+template<class T>
+class deque {
+public:
+	static const int bufsize = 512;
+	typedef T* pointer;
+	typedef pointer* map_pointer;
+
+	template<class Ref, class Poi> class base_iterator;
+	typedef base_iterator<T&, T*> iterator;
+	typedef base_iterator<const T&, const T*> const_iterator;
+
+	template<class Ref, class Poi>
+	class base_iterator {
+	private:
+		deque *self;
+		map_pointer node;
+		pointer first, last, cur;
+
+		base_iterator(): self(0), node(0), first(0), last(0), cur(0) {}
+		base_iterator(deque *_self, map_pointer _node, pointer _cur): self(_self), node(_node), first(*_node), last(*_node + bufsize), cur(_cur) {}
+		base_iterator(const base_iterator &other): self(other.self), node(other.self), first(other.first), last(other.last), cur(other.cur) {}
+
+		void set_node(map_pointer o) {
+			node = o;
+			first = *o;
+			last = first + bufsize;
+		}
+	public:
+		/**
+		 * return a new iterator which pointer n-next elements
+		 *   even if there are not enough elements, the behaviour is **undefined**.
+		 * as well as operator-
+		 */
+		base_iterator operator+(const int &n) const {
+			base_iterator tmp = *this;
+			return tmp += n;
+		}
+		base_iterator operator-(const int &n) const {
+			base_iterator tmp = *this;
+			return tmp -= n;
+		}
+		// return th distance between two iterator,
+		// if these two iterators points to different vectors, throw invaild_iterator.
+		int operator-(const base_iterator &rhs) const {
+			if(self != rhs.self) throw invalid_iterator();
+			return bufsize + (node - rhs.node - 1) + (cur - first) + (rhs.cur - rhs.first);
+		}
+		base_iterator operator+=(const int &n) {
+			int offset = n + (cur - first);
+			if(offset >= 0 && offset < bufsize) {
+				cur = first + n;
+			} else {
+				int node_offset =
+					offset > 0 ? offset / bufsize :
+					-((-offset - 1) / bufsize) - 1;
+				set_node(node + node_offset);
+				cur = first + (offset - node_offset * bufsize);
+			}
+			return *this;
+		}
+		base_iterator operator-=(const int &n) {
+			return *this += -n;
+		}
+		base_iterator operator++(int) { // iter++
+			base_iterator tmp = *this;
+			++*this;
+			return tmp;
+		}
+		base_iterator& operator++() { // ++iter;
+			++cur;
+			if(cur == last) {
+				set_node(node + 1);
+				cur = first;
+			}
+			return *this;
+		}
+		base_iterator operator--(int) { // iter--
+			base_iterator tmp = *this;
+			--*this;
+			return tmp;
+		}
+		base_iterator& operator--() { // --iter
+			if(cur == first) {
+				set_node(node - 1);
+				cur = last;
+			}
+			--cur;
+			return *this;
+		}
+		Ref operator*() const { return *cur; }
+		Poi operator->() const noexcept { return cur; }
+		bool operator==(const base_iterator &rhs) const {
+			return cur == rhs.cur;
+		}
+		bool operator!=(const base_iterator &rhs) const {
+			return cur != rhs.cur;
+		}
+	};
+	
+	/**
+	 * Constructors
+	 */
+	deque(): start(), finish(), map(0), map_size(0) {
+		create_map_and_nodes(0);
+	}
+	deque(const deque &other): start(), finish(), map(0), map_size(0) {
+		create_map_and_nodes(x.size());
+		uninitialized_copy(x.begin(), x.end(), start);
+	}
+	/**
+	 * Deconstructor
+	 */
+	~deque() {
+		destroy(start, finish);
+		destroy_map_and_nodes();
+	}
+	/**
+	 * TODO assignment operator
+	 */
+	deque& operator=(const deque &other) {
+		const int len = size();
+		if (&other != this) {
+			if(len >= other.size()) {
+				erase(copy(other.begin(), other.end(), start), finish);
+			} else {
+				const_iterator mid = other.begin() + len;
+				copy(other.begin(), mid, start);
+				insert(finish, mid, other.end());
+			}
+		}
+		return *this;
+	}
+	/**
+	 * access specified element with bounds checking
+	 * throw index_out_of_bound if out of bound.
+	 */
+	T& at(const size_t &pos) {
+		if(pos < 0 || pos >= sz) throw index_out_of_bound();
+		return *(start + pos);
+	}
+	const T& at(const size_t &pos) const {
+		if(pos < 0 || pos >= sz) throw index_out_of_bound();
+		return *(start + pos);
+	}
+	T& operator[](const size_t &pos) { return at(pos); }
+	const T& operator[](const size_t &pos) const { return at(pos); }
+	/**
+	 * access the first element
+	 * throw container_is_empty when the container is empty.
+	 */
+	const T& front() const {
+		return *start;
+	}
+	/**
+	 * access the last element
+	 * throw container_is_empty when the container is empty.
+	 */
+	const T& back() const {
+		iterator tmp = finish;
+		return *--tmp;
+	}
+	/**
+	 * returns an iterator to the beginning.
+	 */
+	iterator begin() { return start; }
+	const_iterator cbegin() const { return start; }
+	/**
+	 * returns an iterator to the end.
+	 */
+	iterator end() { return finish; }
+	const_iterator cend() const { return finish; }
+	/**
+	 * checks whether the container is empty.
+	 */
+	bool empty() const { return sz == 0; }
+	/**
+	 * returns the number of elements
+	 */
+	size_t size() const { return sz; }
+	/**
+	 * clears the contents
+	 */
+	void clear() {
+		for(map_pointer node = start.node + 1; node < finish.node; ++node) {
+			for(int i = 0; i < bufsize; i++) delete *node + i;
+		}
+		finish = start;
+	}
+	/**
+	 * inserts elements at the specified locat on in the container.
+	 * inserts value before pos
+	 * returns an iterator pointing to the inserted value
+	 *     throw if the iterator is invalid or it point to a wrong place.
+	 */
+	iterator insert(iterator pos, const T &value) {
+		if(pos.self != this) throw invalid_iterator;
+		if(pos == start) {
+			push_front(value);
+			return start;
+		} else if(pos == finish) {
+			push_back(value);
+			iterator tmp = finish;
+			return --tmp;
+		} else {
+			int idx = pos - start;
+			if(idx < (sz << 1)) {
+				push_front(front());
+				iterator front1 = start; ++front1;
+				iterator front2 = front1; ++front2;
+				iterator pos1 = pos = start + idx; ++pos1;
+				copy(front2, pos1, front1);
+			} else {
+				push_back(back());
+				iterator back1 = finish; --back1;
+				iterator back2 = back1; --back2;
+				pos = start + idx;
+				copy_backward(pos, back2, back1);
+			}
+			*pos = value;
+			return pos;
+		}
+	}
+	/**
+	 * removes specified element at pos.
+	 * removes the element at pos.
+	 * returns an iterator pointing to the following element, if pos pointing to the last element, end() will be returned.
+	 * throw if the container is empty, the iterator is invalid or it points to a wrong place.
+	 */
+	iterator erase(iterator pos) {
+		if(sz == 0) throw container_is_empty();
+		if(pos.self != this) throw invalid_iterator();
+		int idx = pos - start;
+		if(idx < 0 || idx >= sz) throw invalid_iterator();
+		iterator nxt = pos; ++nxt;
+		if(idx < (sz >> 1)) {
+			copy_backward(start, pos, nxt);
+			pop_front();
+		} else {
+			copy(nxt, finish, pos);
+			pop_back();
+		}
+		return start + idx;
+	}
+	/**
+	 * adds an element to the end
+	 */
+	void push_back(const T &value) {
+		if(finish.cur != finish.last - 1) {
+			finish.cur = new T(value);
+			*finish.cur = value;
+		} else {
+		}
+	}
+	/**
+	 * removes the last element
+	 *     throw when the container is empty.
+	 */
+	void pop_back() {}
+	/**
+	 * inserts an element to the beginning.
+	 */
+	void push_front(const T &value) {}
+	/**
+	 * removes the first element.
+	 *     throw when the container is empty.
+	 */
+	void pop_front() {}
+
+private:
+	iterator start, finish;
+	map_poinrer map, map_size;
+	int sz;
+};
+
+}
+
+#endif
