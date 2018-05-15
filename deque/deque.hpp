@@ -74,7 +74,7 @@ public:
 
 	public:
 		base_iterator(): self(0), node(0), first(0), last(0), cur(0), idx(0) {}
-		base_iterator(const deque *_self, const block_pointer _node, const int &_cur, const int &_idx): self(_self), node(_node), first(_node->data[0]), last(_node->data[_node->sz]), cur(_cur), idx(_idx) {}
+		base_iterator(const deque *_self, block_pointer _node, const int &_cur, const int &_idx): self(_self), node(_node), first(_node->data[0]), last(_node->data[_node->sz]), cur(_cur), idx(_idx) {}
 		base_iterator(const base_iterator &other): self(other.self), node(other.node), first(other.first), last(other.last), cur(other.cur), idx(other.idx) {}
 
 		void set_node(block_pointer o) {
@@ -99,7 +99,7 @@ public:
 		// return th distance between two iterator,
 		// if these two iterators points to different vectors, throw invaild_iterator.
 		int operator-(const base_iterator &rhs) const {
-			if(self != rhs.self) throw invalid_iterator();
+			if(self != rhs.self) throw invalid_iterator;
 			return idx - rhs.idx;
 		}
 		base_iterator operator+=(const int &n) {
