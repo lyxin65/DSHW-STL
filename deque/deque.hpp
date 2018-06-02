@@ -5,12 +5,6 @@
 
 #include <cstddef>
 
-#ifdef LOCAL
-#include <cassert>
-#include <iostream>
-#define debug(x) std::cerr << #x << "=" << x << std::endl
-#endif
-
 namespace sjtu { 
 
 template<class T>
@@ -38,7 +32,7 @@ private:
 		}
 	};
 
-	class block;
+	struct block;
 	typedef block* block_pointer;
 	struct block {
 		int sz;
@@ -99,7 +93,7 @@ public:
 		// return th distance between two iterator,
 		// if these two iterators points to different vectors, throw invaild_iterator.
 		int operator-(const base_iterator &rhs) const {
-			if(self != rhs.self) throw invalid_iterator;
+			if(self != rhs.self) throw invalid_iterator();
 			return idx - rhs.idx;
 		}
 		base_iterator operator+=(const int &n) {
@@ -248,17 +242,11 @@ public:
 	}
 
 	deque& operator=(const deque &&other) {
-#ifdef LOCAL
-		std::cerr << "moving" << std::endl;
-#endif
 		if(this == &other) return *this;
 		clear(); delete head; delete tail;
 		block_pointer now = head;
 		for(block_pointer i = other.head; i; i = i->nxt) {
 			now = i;
-#ifdef LOCAL
-			assert(now->sz == i->sz);
-#endif
 			for(int j = 0; j < i->sz; j++) {
 				now->data[j] = i->data[j];
 				i->data[j] = 0;
@@ -472,9 +460,6 @@ private:
 		++sz;
 		int p = pos.idx;
 
-#ifdef LOCAL
-		assert(pos.last == pos.node->data[pos.node->sz]);
-#endif
 		pos.node->data[pos.node->sz] = new T(*pos.node->data[pos.node->sz - 1]);
 		for(int t = pos.node->sz - 1; t != pos.cur; --t) {
 			*pos.node->data[t] = *pos.node->data[t - 1];

@@ -10,12 +10,6 @@
 #include "utility.hpp"
 #include "exceptions.hpp"
 
-inline int rnd() {
-	static unsigned seed = 6791654;
-	seed = seed * 998244353 + 21474;
-	return seed & ((1u << 31) - 1);
-}
-
 namespace sjtu {
 
 template<class T>
@@ -42,27 +36,34 @@ public:
 	 */
 	typedef pair<const Key, T> value_type;
 
-	struct node
+	struct node // node for avl
 	{
 		value_type *val;
 		node *lc, *rc, *pre, *nxt;
-		int r, sz;
+		int h, sz;
 
-		node(): val(0), lc(0), rc(0), pre(0), nxt(0), sz(0) {}
-		node(const value_type &_val): lc(0), rc(0), pre(0), nxt(0), r(rnd()), sz(1) {
+		node(): val(0), lc(0), rc(0), pre(0), nxt(0), h(-1), sz(0) {}
+		node(const value_type &_val): lc(0), rc(0), pre(0), nxt(0), h(0), sz(1) {
 			val = new value_type(_val);
 		}
-		node(const node &o): lc(o.lc), rc(o.rc), pre(o.pre), nxt(o.nxt), r(o.r), sz(o.sz) {
+		node(const node &o): lc(o.lc), rc(o.rc), pre(o.pre), nxt(o.nxt), h(o.h), sz(o.sz) {
 			val = new value_type(*o.val);
 		}
 		~node() {
 			delete val;
 		}
+		static int get_height(node *o) {
+			return o ? o->h : -1;
+		}
 		static int get_size(node *o) {
 			return o ? o->sz : 0;
 		}
+		int balance() const {
+			return get_height(lc) - get_height(rc);
+		}
 		void update() {
 			sz = get_size(lc) + get_size(rc) + 1;
+			h = max(get_height(lc), get_height(rc)) + 1;
 		}
 	};
 
@@ -111,8 +112,7 @@ public:
 		 * ++iter
 		 */
 		base_iterator& operator++() {
-			if (!data || !data->nxt)
-				throw invalid_iterator(); 
+			if (!data || !data->nxt) throw invalid_iterator(); 
 			data = data->nxt;
 			return *this;
 		}
@@ -128,8 +128,7 @@ public:
 		 * --iter
 		 */
 		base_iterator& operator--() {
-			if (!data || !data->pre)
-				throw invalid_iterator();
+			if (!data || !data->pre) throw invalid_iterator();
 			data = data->pre;
 			 return *this;
 		}
@@ -161,7 +160,7 @@ public:
 	map(): root(0) {
 		st = ed = new node();
 	}
-	map(const map &o): root(0) {
+	map(const map &o) {
 		if (!o.root) {
 			st = ed = new node();
 		} else {
@@ -202,14 +201,12 @@ public:
 	 */
 	T& at(const Key &key) {
 		node *o = find(root, key);
-		if (!o)
-			throw index_out_of_bound();
+		if (!o) throw index_out_of_bound();
 		return o->val->second;
 	}
 	const T& at(const Key &key) const {
 		node *o = find(root, key);
-		if (!o)
-			throw index_out_of_bound();
+		if (!o) throw index_out_of_bound();
 		return o->val->second;
 	}
 	/**
@@ -344,14 +341,15 @@ private:
 		if (r) r->pre = l;
 	}
 	/*
-	   copy copy copy!!
+	   TODO
+	   behave like stl_tree.hpp
+	   (maybe faster)
 	 */
 	void copy(node *&o, const node *other) {
 		if (!other) return;
 		o = new node(*other->val);
 		copy(o->lc, other->lc);
 		copy(o->rc, other->rc);
-		o->update();
 	}
 	/*
 	   clear all data
@@ -372,6 +370,18 @@ private:
 		if (!tmp) st = o;
 		link(tmp, o); tmp = o;
 		if (o->rc) relink(o->rc, tmp);
+	}
+	node* left_most() {
+		node *o = root;
+		while (o->lc)
+			o = o->lc;
+		return o;
+	}
+	node* right_most() {
+		node *o = root;
+		while (o->rc)
+			o = o->rc;
+		return o;
 	}
 	/*
 	   return pointer to key
@@ -404,6 +414,14 @@ private:
 		k->update();
 		o = k;
 	}
+	inline void LR(node *&o) {
+		RR(o->lc);
+		LL(o);
+	}
+	inline void RL(node *&o) {
+		LL(o->rc);
+		RR(o);
+	}
 
 	node *get_kth(node *o, int k) const {
 		if (get_size(o) < k) return 0;
@@ -423,33 +441,39 @@ private:
 			o = new node(value);
 			return pair<node*, bool>(o, true);
 		} else if (cmp(value.first, o->val->first)) {
-			bool flag = o->lc == 0;
 			auto res = insert(o->lc, value);
 			if (res.second == false)
 				return res;
 			else
 				i = res.first;
-			if (flag) {
+			if (o->lc == res.first) {
 				if (st == o)
 					st = o->lc;
 				link(o->pre, o->lc);
 				link(o->lc, o);
 			}
-			if (o->lc->r > o->r)
-				LL(o);
+			if (o->balance() == 2) {
+				if (cmp(value.first, o->lc->val->first))
+					LL(o);
+				else
+					LR(o);
+			}
 		} else if (cmp(o->val->first, value.first)) {
-			bool flag = o->rc == 0;
 			auto res = insert(o->rc, value);
 			if (res.second == false)
 				return res;
 			else
 				i = res.first;
-			if (flag) {
+			if (o->rc == res.first) {
 				link(o->rc, o->nxt);
 				link(o, o->rc);
 			}
-			if (o->rc->r > o->r)
-				RR(o);
+			if (o->balance() == -2) {
+				if (cmp(o->rc->val->first, value.first))
+					RR(o);
+				else
+					RL(o);
+			}
 		} else {
 			i = o;
 			ok = false;
@@ -462,15 +486,31 @@ private:
 		if (!o) throw runtime_error();
 		if (cmp(key, o->val->first)) {
 			remove(o->lc, key);
+			adjust(o);
 		} else if (cmp(o->val->first, key)) {
 			remove(o->rc, key);
+			adjust(o);
 		} else {
 			if (o->lc && o->rc) {
-				if (o->lc->r > o->rc->r) {
-					LL(o); remove(o->rc, key);
+				node *tmp = o->nxt;
+				swap(o->h, tmp->h);
+				swap(o->sz, tmp->sz);
+				if (tmp != o->rc) {
+					node *fa = o->rc;
+					while (fa->lc != tmp) fa = fa->lc;
+					fa->lc = o;
+					swap(tmp->rc, o->rc);
+					tmp->lc = o->lc;
+					o->lc = 0;
 				} else {
-					RR(o); remove(o->lc, key);
+					o->rc = tmp->rc;
+					tmp->rc = o;
+					tmp->lc = o->lc;
+					o->lc = 0;
 				}
+				swap(o, tmp);
+				remove(o->rc, tmp->val->first);
+				adjust(o);
 			} else {
 				node *tmp = o;
 				if (st == o)
@@ -483,7 +523,18 @@ private:
 				delete tmp;
 			}
 		}
-		if (o) o->update();
+	}
+
+	void adjust(node *&o) {
+		o->update();
+		if (o->balance() == -2) {
+			int t = o->rc->balance();
+			if (t == 0 || t == -1) RR(o); else RL(o);
+		}
+		if (o->balance() == 2) {
+			int t = o->lc->balance();
+			if (t == 0 || t == 1) LL(o); else LR(o);
+		}
 	}
 };
 

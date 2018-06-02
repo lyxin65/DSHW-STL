@@ -300,9 +300,9 @@ public:
 					{
 						father->left = t;
 						tmp->left = t->left; t->left = nullptr;
-						Node *op = tmp->right; tmp->right = t->right; t->right = op;
-						int o = tmp->height; tmp->height = t->height; t->height = o;
-						op = t;  t = tmp; tmp = op;
+						Node *op = tmp->right; tmp->right = t->right; t->right = op; // swap(tmp->right, t->right)
+						int o = tmp->height; tmp->height = t->height; t->height = o; // swap(tmp->height, t->height)
+						op = t;  t = tmp; tmp = op; // swap(tmp, t)
 						if (remove(tmp->data->first, t->right)) return true;
 						return adjust(t, 1);
 					}
